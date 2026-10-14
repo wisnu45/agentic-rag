@@ -44,3 +44,20 @@ def test_access_token_contains_subject_and_expiration(monkeypatch):
     claims = jwt.decode(token, secret, algorithms=["HS256"])
     assert claims["sub"] == "demo-user"
     assert claims["exp"] > claims["iat"]
+
+
+def test_access_token_rejects_placeholder_secret(monkeypatch):
+    monkeypatch.setattr(
+        auth,
+        "get_settings",
+        lambda: type(
+            "Settings",
+            (),
+            {
+                "jwt_secret_key": "REPLACE_WITH_UNIQUE_RANDOM_SECRET",
+                "jwt_access_token_minutes": 30,
+            },
+        )(),
+    )
+    with pytest.raises(RuntimeError, match="JWT_SECRET_KEY"):
+        auth.create_access_token("admin")
