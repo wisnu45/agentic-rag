@@ -18,6 +18,7 @@ export default function App() {
 
   async function handleUpload(event) {
     event.preventDefault();
+    const form = event.currentTarget;
     if (!file || uploading) return;
     setUploading(true);
     setUploadError("");
@@ -26,7 +27,7 @@ export default function App() {
       const data = await uploadDocument(file);
       setUploadResult(data);
       setFile(null);
-      event.currentTarget.reset();
+      form.reset();
     } catch (err) {
       setUploadError(err?.response?.data?.detail || "Upload gagal. Pastikan API, database, dan Ollama tersedia.");
     } finally {
