@@ -15,6 +15,7 @@ from ingestion import ALLOWED_EXTENSIONS, IngestionError, chunk_pages, embed_tex
 from models import Document, DocumentChunk
 from rag import RAGGenerationError, generate_answer
 from schemas import ChatRequest, ChatResponse, DocumentUploadResponse, HealthResponse, SearchRequest, SearchResponse, SearchResult
+from security import StorageEncryptionError, encrypt_file
 
 settings = get_settings()
 app = FastAPI(
@@ -113,7 +114,15 @@ def upload_document(file: UploadFile = File(...)) -> DocumentUploadResponse:
         if not chunks:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No text chunks could be created.")
 
-        stored_path.write_bytes(data)
+        try:
+            encrypted_data = encrypt_file(data)
+        except StorageEncryptionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Encrypted file storage is not configured correctly.",
+            ) from exc
+
+        stored_path.write_bytes(encrypted_data)
         document = Document(
             filename=original_name[:255],
             mime_type=file.content_type or mimetypes.guess_type(original_name)[0],
