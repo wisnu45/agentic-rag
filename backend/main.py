@@ -13,7 +13,7 @@ from config import get_settings
 from database import SessionLocal, check_database_connection
 from ingestion import ALLOWED_EXTENSIONS, IngestionError, chunk_pages, embed_text, extract_pages
 from models import Document, DocumentChunk
-from schemas import DocumentUploadResponse, HealthResponse
+from schemas import DocumentUploadResponse, HealthResponse, SearchRequest, SearchResponse, SearchResult
 
 settings = get_settings()
 app = FastAPI(
@@ -164,3 +164,45 @@ def upload_document(file: UploadFile = File(...)) -> DocumentUploadResponse:
     finally:
         db.close()
         file.file.close()
+
+
+
+@app.post("/api/search", response_model=SearchResponse, tags=["retrieval"])
+def search_documents(payload: SearchRequest) -> SearchResponse:
+    """Retrieve the most similar indexed chunks using cosine distance."""
+    try:
+        query_embedding = embed_text(payload.query)
+    except IngestionError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    db = SessionLocal()
+    try:
+        distance = DocumentChunk.embedding.cosine_distance(query_embedding).label("distance")
+        statement = (
+            select(DocumentChunk, Document, distance)
+            .join(Document, DocumentChunk.document_id == Document.id)
+            .where(Document.status == "indexed")
+            .order_by(distance)
+            .limit(payload.top_k)
+        )
+        rows = db.execute(statement).all()
+        results = [
+            SearchResult(
+                document_id=str(document.id),
+                filename=document.filename,
+                page_number=chunk.page_number,
+                chunk_index=chunk.chunk_index,
+                content=chunk.content,
+                score=1.0 - float(distance_value),
+            )
+            for chunk, document, distance_value in rows
+            if distance_value is not None
+        ]
+        return SearchResponse(query=payload.query, results=results)
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Vector search is unavailable. Verify the database schema and pgvector extension.",
+        ) from exc
+    finally:
+        db.close()
