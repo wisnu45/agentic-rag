@@ -42,7 +42,9 @@ export function logout() {
 }
 
 export async function getHealth() {
-  const response = await api.get("/health");
+  const response = (import.meta.env.VITE_API_BASE_URL || "") === "/api"
+    ? await axios.get("/health")
+    : await api.get("/health");
   return response.data;
 }
 
