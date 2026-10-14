@@ -1,24 +1,23 @@
 # Agentic RAG — Local AI System
 
-Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, LangChain (tahap integrasi berikutnya), Ollama, PaddleOCR (tahap integrasi berikutnya), dan PostgreSQL + pgvector**.
+Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, SQLAlchemy, PostgreSQL + pgvector, Ollama, dan PaddleOCR**. LangChain, OCR pipeline, retrieval, dan agent tools akan diintegrasikan bertahap.
 
 ## Status
-Fondasi aplikasi, health checks, Docker Compose, dan CI awal sudah tersedia. Pipeline RAG, OCR, agent tools, autentikasi, dan deployment production belum selesai.
+Repository sudah memiliki fondasi aplikasi, Docker Compose, health checks, CI awal, serta model metadata dokumen dan chunk vector. Pipeline ingest, embedding, OCR, chat/RAG, autentikasi, dan deployment production belum selesai.
 
-## Struktur
+## Struktur utama
 - `frontend/`: ViteJS + React + TailwindCSS
-- `backend/`: FastAPI dan SQLAlchemy
-- `storage/uploads/`: file upload lokal (tidak di-commit)
-- `storage/processed/`: hasil pemrosesan lokal (tidak di-commit)
+- `backend/`: FastAPI, konfigurasi, SQLAlchemy, model dokumen, dan perintah inisialisasi DB
+- `backend/models.py`: tabel `documents` dan `document_chunks`; embedding disiapkan untuk 768 dimensi `nomic-embed-text`
+- `backend/init_db.py`: inisialisasi extension pgvector dan tabel awal
 - `docker-compose.yml`: PostgreSQL + pgvector, FastAPI, dan frontend Nginx
-- `.env.example`: template konfigurasi; salin menjadi `.env`
-- `.github/workflows/ci.yml`: backend test dan frontend build
+- `.github/workflows/ci.yml`: backend tests dan frontend build
 
 ## Prasyarat
 - Docker Desktop dengan Docker Compose
 - Git
 - Untuk pengembangan tanpa Docker: Python 3.11+, Node.js 20+, dan npm
-- Ollama lokal untuk tahap integrasi model; model disesuaikan dengan kapasitas perangkat
+- Ollama lokal untuk tahap integrasi model; model harus disesuaikan dengan kapasitas perangkat
 
 ## Jalankan seluruh aplikasi dengan Docker
 Dari root repository:
@@ -27,9 +26,9 @@ Dari root repository:
 Copy-Item .env.example .env
 ```
 
-Buka `.env`, ganti `POSTGRES_PASSWORD` dengan password lokal yang kuat (gunakan karakter alfanumerik untuk menghindari masalah URL encoding), dan samakan password di `DATABASE_URL` untuk menjalankan backend langsung dari host. Docker Compose menyusun URL database internalnya sendiri.
+Buka `.env` dan ubah `POSTGRES_PASSWORD` menjadi password lokal yang kuat. Gunakan karakter alfanumerik untuk menghindari masalah URL encoding. Jika menjalankan backend langsung dari host, samakan password di `DATABASE_URL`. Docker Compose membentuk URL internal database sendiri.
 
-Kemudian jalankan:
+Kemudian:
 
 ```bash
 docker compose up --build -d
@@ -38,39 +37,48 @@ docker compose ps
 
 Akses:
 - Frontend: http://localhost:8080
-- API langsung: http://localhost:8000
+- API: http://localhost:8000
 - Dokumentasi API: http://localhost:8000/docs
 - Liveness: http://localhost:8000/health
 - Readiness database: http://localhost:8000/health/ready
 
-Log layanan:
+Log dan stop:
+
 ```bash
 docker compose logs -f backend
 docker compose logs -f frontend
-```
-
-Matikan layanan:
-```bash
 docker compose down
 ```
 
-Data PostgreSQL tetap tersimpan di named volume. Untuk menghapus volume database secara permanen, jangan gunakan `-v` kecuali memang ingin menghapus data.
+## Inisialisasi schema pgvector
+Setelah database tersedia, jalankan sekali dari root repository:
 
-## Menjalankan tanpa Docker (development)
-### Database
-Pastikan PostgreSQL + pgvector berjalan, lalu konfigurasi `DATABASE_URL` di `.env`.
+```bash
+docker compose exec backend python init_db.py
+```
 
-### Backend (PowerShell)
+Perintah ini membuat extension `vector` dan tabel awal. Tabel yang dibuat:
+- `documents`: metadata file, hash SHA-256, status pemrosesan, dan lokasi penyimpanan
+- `document_chunks`: teks per chunk, indeks chunk, nomor halaman, metadata, dan embedding vector
+
+Dimensi embedding awal disetel ke 768 untuk `nomic-embed-text`. Jika model embedding diganti, sesuaikan dimensi sebelum menyimpan vector dari model baru.
+
+## Menjalankan backend tanpa Docker
+Pastikan PostgreSQL + pgvector tersedia dan `DATABASE_URL` pada `.env` sesuai.
+
 ```powershell
 cd backend
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+python init_db.py
 uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### Frontend (terminal terpisah)
+## Menjalankan frontend tanpa Docker
+Terminal terpisah:
+
 ```powershell
 cd frontend
 npm install
@@ -79,20 +87,30 @@ npm run dev
 
 Frontend development: http://localhost:5173
 
+## Tes backend
+Dari folder `backend`:
+
+```bash
+pip install pytest
+pytest -q
+```
+
+GitHub Actions juga menjalankan backend tests dan frontend build pada push/pull request ke branch `main`.
+
 ## Ollama
-Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Saat backend berjalan di Docker, konfigurasi default mengakses host melalui `host.docker.internal:11434`. Pada lingkungan yang tidak mendukung hostname tersebut, sesuaikan `OLLAMA_BASE_URL`.
+Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Default konfigurasi model adalah `llama3` dan embedding `nomic-embed-text`. Saat backend berjalan di Docker, URL default mengarah ke host melalui `host.docker.internal:11434`; sesuaikan pada lingkungan yang tidak mendukung hostname tersebut.
 
 ## Keamanan
 - Jangan commit file `.env`, kredensial, uploads, atau hasil pemrosesan.
-- PostgreSQL diikat ke localhost; jangan ekspos port database ke internet.
+- PostgreSQL hanya dipublikasikan ke localhost; jangan ekspos port database ke internet.
 - Ganti secrets sebelum penggunaan bersama/production.
-- SQL Agent nantinya wajib memakai koneksi read-only, allowlist tabel/kolom, timeout, dan validasi query.
-- Dokumen dari RAG harus diperlakukan sebagai data tidak tepercaya, bukan instruksi.
-- Dockerfile saat ini untuk fondasi development; hardening production, TLS, autentikasi, dan observability masih perlu dikerjakan.
+- SQL Agent nantinya harus memakai koneksi read-only, allowlist tabel/kolom, timeout, dan validasi query.
+- Dokumen dari RAG adalah data tidak tepercaya, bukan instruksi.
+- Hardening production, TLS, autentikasi, backup, dan observability masih perlu dikerjakan.
 
 ## Tahapan implementasi
 1. Fondasi repository, Docker, health checks, dan CI.
-2. Skema metadata dokumen serta koneksi pgvector.
+2. Skema metadata dokumen serta pgvector.
 3. Pipeline ingest dokumen, chunking, embedding, dan retrieval.
 4. OCR dengan PaddleOCR dan agent tools.
 5. Frontend chat/upload dan sitasi sumber.
