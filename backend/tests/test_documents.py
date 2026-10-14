@@ -1,8 +1,12 @@
+from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
 
+from auth import get_current_user
 from main import app
 
 client = TestClient(app)
+app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(username="test-admin", role="admin")
 
 
 def test_upload_rejects_unsupported_extension_before_database_access():
@@ -21,3 +25,12 @@ def test_upload_rejects_empty_file_before_database_access():
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "Uploaded file is empty."
+
+
+def test_document_search_requires_authentication():
+    app.dependency_overrides.pop(get_current_user, None)
+    try:
+        response = client.post("/api/search", json={"query": "test"})
+        assert response.status_code == 401
+    finally:
+        app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(username="test-admin", role="admin")
