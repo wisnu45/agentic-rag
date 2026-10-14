@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     ollama_embedding_model: str = "nomic-embed-text"
     upload_dir: str = "../storage/uploads"
     processed_dir: str = "../storage/processed"
+    max_upload_size_mb: int = 20
+    chunk_size: int = 1000
+    chunk_overlap: int = 150
     cors_origins: str = "http://localhost:5173"
 
     model_config = SettingsConfigDict(
