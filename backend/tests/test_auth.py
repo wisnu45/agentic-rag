@@ -61,3 +61,21 @@ def test_access_token_rejects_placeholder_secret(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="JWT_SECRET_KEY"):
         auth.create_access_token("admin")
+
+
+def test_current_user_rejects_placeholder_secret_before_database_access(monkeypatch):
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(
+        auth,
+        "get_settings",
+        lambda: type(
+            "Settings",
+            (),
+            {"jwt_secret_key": "REPLACE_WITH_UNIQUE_RANDOM_SECRET"},
+        )(),
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        auth.get_current_user(token="not-a-real-token")
+    assert exc_info.value.status_code == 503
+    assert "JWT_SECRET_KEY" in exc_info.value.detail
