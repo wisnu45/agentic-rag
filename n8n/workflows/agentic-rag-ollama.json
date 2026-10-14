@@ -6,7 +6,8 @@
         "httpMethod": "POST",
         "path": "agentic-rag-chat",
         "responseMode": "usingRespondToWebhook",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
       "id": "1a4a4a3a-70c2-4ed6-9a50-3dfce88a3101",
       "name": "Webhook",
