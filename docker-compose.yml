@@ -20,6 +20,8 @@ services:
   backend:
     build:
       context: ./backend
+      args:
+        INSTALL_OCR: ${INSTALL_OCR:-false}
     container_name: agentic-rag-api
     restart: unless-stopped
     environment:
