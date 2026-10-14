@@ -13,7 +13,8 @@ from config import get_settings
 from database import SessionLocal, check_database_connection
 from ingestion import ALLOWED_EXTENSIONS, IngestionError, chunk_pages, embed_text, extract_pages
 from models import Document, DocumentChunk
-from schemas import DocumentUploadResponse, HealthResponse, SearchRequest, SearchResponse, SearchResult
+from rag import RAGGenerationError, generate_answer
+from schemas import ChatRequest, ChatResponse, DocumentUploadResponse, HealthResponse, SearchRequest, SearchResponse, SearchResult
 
 settings = get_settings()
 app = FastAPI(
@@ -203,6 +204,70 @@ def search_documents(payload: SearchRequest) -> SearchResponse:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Vector search is unavailable. Verify the database schema and pgvector extension.",
+        ) from exc
+    finally:
+        db.close()
+
+
+
+@app.post("/api/chat", response_model=ChatResponse, tags=["rag"])
+def chat_with_documents(payload: ChatRequest) -> ChatResponse:
+    """Answer a question using retrieved document chunks and source markers."""
+    try:
+        query_embedding = embed_text(payload.message)
+    except IngestionError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    db = SessionLocal()
+    try:
+        distance = DocumentChunk.embedding.cosine_distance(query_embedding).label("distance")
+        statement = (
+            select(DocumentChunk, Document, distance)
+            .join(Document, DocumentChunk.document_id == Document.id)
+            .where(Document.status == "indexed")
+            .order_by(distance)
+            .limit(5)
+        )
+        rows = db.execute(statement).all()
+        if not rows:
+            return ChatResponse(
+                answer="Belum ada dokumen terindeks yang dapat dijadikan sumber jawaban. Unggah dokumen terlebih dahulu.",
+                tool_used="pgvector_retrieval",
+                sources=[],
+            )
+
+        contexts = []
+        sources = []
+        for index, (chunk, document, distance_value) in enumerate(rows, start=1):
+            source_id = f"S{index}"
+            page = str(chunk.page_number) if chunk.page_number is not None else "n/a"
+            contexts.append({
+                "source_id": source_id,
+                "filename": document.filename,
+                "page": page,
+                "content": chunk.content,
+            })
+            sources.append({
+                "source_id": source_id,
+                "filename": document.filename,
+                "page": page,
+                "chunk_index": str(chunk.chunk_index),
+            })
+
+        try:
+            answer = generate_answer(payload.message, contexts)
+        except RAGGenerationError as exc:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+        return ChatResponse(
+            answer=answer,
+            tool_used="pgvector_retrieval+ollama",
+            sources=sources,
+        )
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document retrieval is unavailable. Verify PostgreSQL and pgvector.",
         ) from exc
     finally:
         db.close()
