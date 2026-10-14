@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getHealth, searchDocuments, uploadDocument } from "./services/api";
+import { askQuestion, getHealth, uploadDocument } from "./services/api";
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState("checking");
@@ -8,9 +8,9 @@ export default function App() {
   const [uploadResult, setUploadResult] = useState(null);
   const [uploadError, setUploadError] = useState("");
   const [query, setQuery] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState(null);
-  const [searchError, setSearchError] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [chatResponse, setChatResponse] = useState(null);
+  const [chatError, setChatError] = useState("");
 
   useEffect(() => {
     getHealth().then(() => setApiStatus("online")).catch(() => setApiStatus("offline"));
@@ -34,19 +34,19 @@ export default function App() {
     }
   }
 
-  async function handleSearch(event) {
+  async function handleAsk(event) {
     event.preventDefault();
-    if (!query.trim() || searching) return;
-    setSearching(true);
-    setSearchError("");
-    setSearchResults(null);
+    if (!query.trim() || asking) return;
+    setAsking(true);
+    setChatError("");
+    setChatResponse(null);
     try {
-      const data = await searchDocuments(query.trim());
-      setSearchResults(data.results);
+      const data = await askQuestion(query.trim());
+      setChatResponse(data);
     } catch (err) {
-      setSearchError(err?.response?.data?.detail || "Pencarian gagal. Pastikan schema database dan Ollama tersedia.");
+      setChatError(err?.response?.data?.detail || "Pertanyaan gagal diproses. Pastikan schema database dan model Ollama tersedia.");
     } finally {
-      setSearching(false);
+      setAsking(false);
     }
   }
 
@@ -88,28 +88,30 @@ export default function App() {
             <p className="mt-4 text-xs leading-5 text-slate-500">PDF hasil scan belum didukung. Database dan Ollama harus aktif.</p>
           </form>
 
-          <form onSubmit={handleSearch} className="h-fit rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-            <h2 className="font-semibold">2. Cari dalam dokumen</h2>
-            <p className="mt-1 text-xs text-slate-400">Pencarian semantik menggunakan embedding dan pgvector.</p>
-            <label htmlFor="search-query" className="mt-5 block text-sm text-slate-300">Pertanyaan atau kata kunci</label>
-            <textarea id="search-query" value={query} onChange={(event) => setQuery(event.target.value)} rows={3} maxLength={5000} placeholder="Contoh: Apa kebijakan keamanan yang disebutkan?" className="mt-2 w-full resize-y rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm outline-none focus:border-cyan-600" />
-            <button type="submit" disabled={!query.trim() || searching || apiStatus === "offline"} className="mt-3 w-full rounded-lg border border-cyan-800 bg-cyan-950/50 px-4 py-3 text-sm font-semibold text-cyan-200 hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:opacity-40">
-              {searching ? "Mencari..." : "Cari dokumen"}
+          <form onSubmit={handleAsk} className="h-fit rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+            <h2 className="font-semibold">2. Tanya dokumen (RAG)</h2>
+            <p className="mt-1 text-xs text-slate-400">Jawaban dirangkai oleh LLM berdasarkan chunk yang paling relevan.</p>
+            <label htmlFor="question" className="mt-5 block text-sm text-slate-300">Pertanyaan</label>
+            <textarea id="question" value={query} onChange={(event) => setQuery(event.target.value)} rows={3} maxLength={10000} placeholder="Contoh: Apa kebijakan keamanan yang disebutkan?" className="mt-2 w-full resize-y rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm outline-none focus:border-cyan-600" />
+            <button type="submit" disabled={!query.trim() || asking || apiStatus === "offline"} className="mt-3 w-full rounded-lg border border-cyan-800 bg-cyan-950/50 px-4 py-3 text-sm font-semibold text-cyan-200 hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:opacity-40">
+              {asking ? "Menyusun jawaban..." : "Tanyakan"}
             </button>
-            {searchError && <p role="alert" className="mt-4 rounded-lg border border-rose-900 bg-rose-950/50 p-3 text-sm text-rose-300">{searchError}</p>}
-            {searchResults && <div className="mt-4 space-y-3">
-              <p className="text-xs text-slate-400">Ditemukan {searchResults.length} hasil terdekat.</p>
-              {searchResults.length === 0 && <p className="rounded-lg bg-slate-950 p-3 text-sm text-slate-400">Belum ada dokumen terindeks yang cocok.</p>}
-              {searchResults.map((item) => <article key={item.document_id + "-" + item.chunk_index} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-cyan-200">{item.filename}</p>
-                  <span className="text-xs text-slate-500">Similarity: {item.score.toFixed(3)}</span>
-                </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{item.content}</p>
-                <p className="mt-2 text-xs text-slate-500">Chunk {item.chunk_index + 1}{item.page_number ? " · Halaman " + item.page_number : ""}</p>
-              </article>)}
+            {chatError && <p role="alert" className="mt-4 rounded-lg border border-rose-900 bg-rose-950/50 p-3 text-sm text-rose-300">{chatError}</p>}
+            {chatResponse && <div className="mt-4 space-y-3">
+              <article className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-300">Jawaban</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">{chatResponse.answer}</p>
+              </article>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Sumber yang diambil</p>
+                {chatResponse.sources.length === 0 && <p className="text-sm text-slate-500">Belum ada sumber dokumen yang terindeks.</p>}
+                {chatResponse.sources.map((source) => <div key={source.source_id} className="mb-2 rounded-lg border border-slate-800 p-3 text-xs">
+                  <p className="font-medium text-cyan-200">[{source.source_id}] {source.filename}</p>
+                  <p className="mt-1 text-slate-500">Halaman: {source.page} · Chunk: {Number(source.chunk_index) + 1}</p>
+                </div>)}
+              </div>
             </div>}
-            <p className="mt-4 text-xs leading-5 text-slate-500">Ini retrieval semantik, belum jawaban generatif dari LLM. Skor similarity bukan probabilitas.</p>
+            <p className="mt-4 text-xs leading-5 text-slate-500">Model diminta mengutip penanda sumber seperti [S1]. Verifikasi jawaban terhadap dokumen asli untuk penggunaan penting.</p>
           </form>
         </section>
         <footer className="border-t border-slate-800 pt-4 text-xs text-slate-500">
