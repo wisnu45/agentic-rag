@@ -15,6 +15,7 @@ from config import get_settings
 from database import SessionLocal, check_database_connection
 from ingestion import ALLOWED_EXTENSIONS, IngestionError, chunk_pages, embed_text, extract_pages
 from models import Document, DocumentChunk, User
+from orchestration import OrchestrationError, generate_agent_answer
 from rag import RAGGenerationError, generate_answer
 from schemas import ChatRequest, ChatResponse, DocumentUploadResponse, HealthResponse, SearchRequest, SearchResponse, SearchResult
 from security import StorageEncryptionError, encrypt_file
@@ -301,13 +302,20 @@ def chat_with_documents(
             })
 
         try:
-            answer = generate_answer(payload.message, contexts)
+            answer = generate_agent_answer(payload.message, contexts)
+            if answer is not None:
+                tool_used = "pgvector_retrieval+n8n"
+            else:
+                answer = generate_answer(payload.message, contexts)
+                tool_used = "pgvector_retrieval+ollama"
+        except OrchestrationError as exc:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
         except RAGGenerationError as exc:
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
         return ChatResponse(
             answer=answer,
-            tool_used="pgvector_retrieval+ollama",
+            tool_used=tool_used,
             sources=sources,
         )
     except SQLAlchemyError as exc:
