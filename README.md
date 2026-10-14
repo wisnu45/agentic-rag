@@ -50,6 +50,19 @@ docker compose logs -f frontend
 docker compose down
 ```
 
+## Upload dan ingest dokumen
+
+Endpoint `POST /api/documents` menerima file TXT, Markdown, PDF berbasis teks, dan DOCX. Endpoint menghitung SHA-256 untuk mencegah upload ulang konten yang sama, mengekstrak teks, membuat chunk ber-overlap, meminta embedding ke Ollama, lalu menyimpan metadata dan vector ke PostgreSQL + pgvector.
+
+Contoh dengan curl:
+
+```bash
+curl -X POST http://localhost:8000/api/documents \
+  -F "file=@./contoh.pdf"
+```
+
+Persyaratan: database schema sudah diinisialisasi dan Ollama sedang berjalan dengan model embedding yang dikonfigurasi. PDF hasil scan dan gambar belum diproses OCR. Pipeline retrieval dan chat belum tersedia pada tahap ini.
+
 ## Inisialisasi schema pgvector
 Setelah database tersedia, jalankan sekali dari root repository:
 
