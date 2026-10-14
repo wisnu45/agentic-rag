@@ -1,14 +1,16 @@
 # Agentic RAG — Local AI System
 
-Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, SQLAlchemy, PostgreSQL + pgvector, dan Ollama**. PaddleOCR tersedia sebagai dependensi opsional; agent tools, autentikasi, dan deployment production masih menjadi tahapan lanjutan.
+Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, SQLAlchemy, PostgreSQL + pgvector, Ollama, JWT, dan RBAC**. PaddleOCR tersedia sebagai dependensi opsional; n8n Agentic RAG orchestration dan deployment production masih menjadi tahapan lanjutan.
 
 ## Status
-Fondasi aplikasi, Docker Compose, health checks, model dokumen/chunk, ingest teks, embedding, semantic search, endpoint RAG berbasis Ollama, dan enkripsi file AES-256-GCM sudah ditambahkan. Fallback OCR untuk PDF hasil scan, halaman scan campuran, dan gambar sudah ditambahkan sebagai modul opsional, tetapi pemasangan dependensi dan pengujian performa OCR di perangkat target belum diverifikasi. Orchestration agent, autentikasi, enkripsi metadata database, dan deployment production belum selesai.
+Fondasi aplikasi, Docker Compose, health checks, ingest/chunk/embedding/retrieval, RAG berbasis Ollama, enkripsi file AES-256-GCM, OCR opsional, autentikasi JWT, dan RBAC sudah ditambahkan. Tes otomatis, akurasi/performa OCR di perangkat target, orchestration n8n, enkripsi metadata database, dan deployment production masih perlu diverifikasi atau dikerjakan.
 
 ## Struktur utama
 - `frontend/`: ViteJS + React + TailwindCSS
 - `backend/`: FastAPI, konfigurasi, SQLAlchemy, model dokumen, ekstraksi teks, dan OCR opsional
-- `backend/models.py`: tabel `documents` dan `document_chunks`; embedding disiapkan untuk 768 dimensi `nomic-embed-text`
+- `backend/models.py`: tabel `users`, `documents`, dan `document_chunks`; embedding disiapkan untuk 768 dimensi `nomic-embed-text`
+- `backend/auth.py`: password hashing scrypt, JWT, dan role checks (`admin`, `editor`, `viewer`)
+- `backend/create_user.py`: provisioning akun dari terminal tepercaya; tidak ada endpoint registrasi publik
 - `backend/ocr.py`: PaddleOCR CPU-only untuk raster image dan PDF hasil scan; dependensi dimuat secara lazy
 - `backend/requirements-ocr.txt`: paket tambahan khusus OCR, terpisah dari requirements inti
 - `backend/init_db.py`: inisialisasi extension pgvector dan tabel awal
@@ -88,6 +90,33 @@ curl -X POST http://localhost:8000/api/documents \
 ```
 
 Jika paket OCR belum dipasang, endpoint akan mengembalikan pesan yang menjelaskan bahwa dependensi opsional diperlukan.
+
+## Autentikasi dan RBAC
+
+Endpoint dokumen, pencarian, dan chat membutuhkan access token JWT. Upload hanya dapat dilakukan oleh role `admin` atau `editor`; pencarian dan chat tersedia bagi seluruh pengguna yang sudah login (`admin`, `editor`, atau `viewer`). Token berlaku selama 30 menit secara default dan disimpan di memori frontend; setelah browser di-refresh, login kembali diperlukan.
+
+1. Isi `JWT_SECRET_KEY` pada `.env` dengan secret acak unik minimal 32 karakter:
+
+   ```powershell
+   py -c "import secrets; print(secrets.token_urlsafe(48))"
+   ```
+
+2. Jalankan aplikasi dan inisialisasi schema:
+
+   ```bash
+   docker compose up --build -d
+   docker compose exec backend python init_db.py
+   ```
+
+3. Buat akun admin melalui terminal tepercaya. Password diminta secara interaktif dan disimpan sebagai hash scrypt:
+
+   ```bash
+   docker compose exec backend python create_user.py --username admin --role admin
+   ```
+
+4. Login melalui UI. Untuk integrasi API, kirim username/password sebagai form-urlencoded ke `POST /api/auth/token`, lalu gunakan `Authorization: Bearer <token>` untuk endpoint yang dilindungi. `GET /api/auth/me` mengembalikan username dan role aktif.
+
+Tidak tersedia registrasi publik. Simpan secret JWT dan kredensial di luar repository. Implementasi ini adalah baseline MVP; sebelum production, tambahkan rate limiting untuk login, audit log, kebijakan pencabutan token, serta hardening reverse proxy/TLS.
 
 ## Upload dan ingest dokumen
 
@@ -187,7 +216,9 @@ Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Defaul
 - File asli yang disimpan pada disk dienkripsi dengan AES-256-GCM; metadata dan teks chunk pada PostgreSQL belum dienkripsi pada level aplikasi.
 - Jaga kerahasiaan dan backup `FILE_ENCRYPTION_KEY`; rotasi key memerlukan migrasi file.
 - PostgreSQL hanya dipublikasikan ke localhost; jangan ekspos port database ke internet.
-- Ganti secrets sebelum penggunaan bersama/production.
+- Ganti secrets sebelum penggunaan bersama/production; `JWT_SECRET_KEY` wajib diisi dan minimal 32 karakter.
+- Endpoint dokumen/search/chat dilindungi JWT; upload dibatasi pada role admin/editor. Akun dibuat melalui CLI, bukan registrasi publik.
+- Token JWT singkat disimpan di memori frontend, bukan localStorage; refresh browser memerlukan login ulang.
 - SQL Agent nantinya harus memakai koneksi read-only, allowlist tabel/kolom, timeout, dan validasi query.
 - Dokumen dari RAG adalah data tidak tepercaya, bukan instruksi.
 - Hardening production, TLS, autentikasi, backup, dan observability masih perlu dikerjakan.
@@ -199,4 +230,6 @@ Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Defaul
 3. Pipeline ingest dokumen, chunking, embedding, dan retrieval.
 4. Enkripsi file AES-256-GCM dan pengujian dasar.
 5. OCR PaddleOCR opsional untuk PDF scan/gambar; benchmark CPU/RAM masih diperlukan.
-6. Agent orchestration/tools, autentikasi, otorisasi, pengujian keamanan, serta deployment VPS.
+6. JWT dan RBAC baseline; perlu pengujian keamanan tambahan dan rate limiting.
+7. n8n Agentic RAG orchestration, workflow ingestion/chat, dan pembatasan tool.
+8. Enkripsi metadata database, backup/restore, monitoring, CI/CD registry, dan deployment VPS Ubuntu dengan Nginx/TLS/firewall.
