@@ -3,7 +3,7 @@
 Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, SQLAlchemy, PostgreSQL + pgvector, dan Ollama**. PaddleOCR, LangChain, agent tools, autentikasi, dan deployment production masih menjadi tahapan lanjutan.
 
 ## Status
-Fondasi aplikasi, Docker Compose, health checks, model dokumen/chunk, ingest teks, embedding, semantic search, dan endpoint RAG berbasis Ollama sudah ditambahkan. OCR untuk dokumen scan, orchestration agent, autentikasi, dan deployment production belum selesai.
+Fondasi aplikasi, Docker Compose, health checks, model dokumen/chunk, ingest teks, embedding, semantic search, endpoint RAG berbasis Ollama, dan enkripsi file AES-256-GCM sudah ditambahkan. OCR untuk dokumen scan, orchestration agent, autentikasi, enkripsi metadata database, dan deployment production belum selesai.
 
 ## Struktur utama
 - `frontend/`: ViteJS + React + TailwindCSS
@@ -159,6 +159,6 @@ Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Defaul
 1. Fondasi repository, Docker, health checks, dan CI.
 2. Skema metadata dokumen serta pgvector.
 3. Pipeline ingest dokumen, chunking, embedding, dan retrieval.
-4. OCR dengan PaddleOCR dan agent tools.
-5. Frontend chat/upload dan sitasi sumber.
-6. Pengujian keamanan dan deployment VPS.
+4. Enkripsi file AES-256-GCM dan pengujian dasar.
+5. OCR dengan PaddleOCR dan agent tools.
+6. Autentikasi, otorisasi, pengujian keamanan, serta deployment VPS.
