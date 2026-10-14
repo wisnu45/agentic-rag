@@ -3,7 +3,7 @@
 Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, SQLAlchemy, PostgreSQL + pgvector, Ollama (model lokal/gratis), JWT, RBAC, dan workflow n8n opsional**. PaddleOCR tersedia sebagai dependensi opsional.
 
 ## Status
-Fondasi aplikasi, Docker Compose, ingest/retrieval, RAG Ollama, enkripsi file AES-256-GCM, OCR opsional, JWT/RBAC, adapter n8n, workflow n8n importable, dan CI sudah tersedia. CI memverifikasi 32 tes backend dan frontend build. Workflow n8n belum diuji end-to-end terhadap instance n8n dan model Ollama yang berjalan; benchmark OCR, enkripsi metadata database, serta deployment production masih perlu dikerjakan.
+Fondasi aplikasi, Docker Compose, ingest/retrieval, RAG Ollama, enkripsi file AES-256-GCM, OCR opsional, JWT/RBAC, adapter n8n, workflow n8n importable, dan CI sudah tersedia. CI terakhir memverifikasi 33 tes backend dan frontend build (periksa run terbaru pada GitHub Actions). Workflow n8n belum diuji end-to-end terhadap instance n8n dan model Ollama yang berjalan; benchmark OCR, enkripsi metadata database, serta deployment production masih perlu dikerjakan.
 
 ## Struktur utama
 - `frontend/`: ViteJS + React + TailwindCSS
