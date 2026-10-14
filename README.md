@@ -87,6 +87,7 @@ Contoh upload gambar melalui API:
 
 ```bash
 curl -X POST http://localhost:8000/api/documents \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
   -F "file=@./scan.jpg"
 ```
 
@@ -181,6 +182,7 @@ Contoh dengan curl:
 
 ```bash
 curl -X POST http://localhost:8000/api/documents \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
   -F "file=@./contoh.pdf"
 ```
 
@@ -192,6 +194,7 @@ Endpoint `POST /api/search` mengubah pertanyaan menjadi embedding melalui Ollama
 
 ```bash
 curl -X POST http://localhost:8000/api/search \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"query":"Apa isi dokumen ini?","top_k":5}'
 ```
@@ -204,6 +207,7 @@ Endpoint `POST /api/chat` mengambil lima chunk terdekat dari pgvector, lalu memi
 
 ```bash
 curl -X POST http://localhost:8000/api/chat \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{"session_id":"demo","message":"Apa poin penting dari dokumen?"}'
 ```
