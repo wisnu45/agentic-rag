@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str = "postgresql+psycopg://agentic_rag_app:change_me_local_only@localhost:5432/agentic_rag"
     ollama_base_url: str = "http://localhost:11434"
-    ollama_llm_model: str = "llama3"
+    ollama_llm_model: str = "qwen2.5:3b"
     ollama_embedding_model: str = "nomic-embed-text"
     upload_dir: str = "../storage/uploads"
     processed_dir: str = "../storage/processed"
