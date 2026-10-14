@@ -19,7 +19,7 @@ class IngestionError(Exception):
 
 
 def extract_pages(filename: str, data: bytes) -> list[tuple[int, str]]:
-    """Extract text from supported documents, falling back to OCR for scans."""
+    """Extract text from supported documents and OCR scanned pages as needed."""
     suffix = Path(filename).suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:
         raise IngestionError("Unsupported file type.")
@@ -32,15 +32,18 @@ def extract_pages(filename: str, data: bytes) -> list[tuple[int, str]]:
             return extract_image_text(filename, data)
         if suffix == ".pdf":
             reader = PdfReader(BytesIO(data), strict=True)
-            pages = []
+            extracted_pages = []
+            missing_page_numbers: set[int] = set()
             for index, page in enumerate(reader.pages, start=1):
                 text = page.extract_text() or ""
                 if text.strip():
-                    pages.append((index, text))
-            if pages:
-                return pages
-            from ocr import extract_scanned_pdf_text
-            return extract_scanned_pdf_text(data)
+                    extracted_pages.append((index, text))
+                else:
+                    missing_page_numbers.add(index)
+            if missing_page_numbers:
+                from ocr import extract_scanned_pdf_text
+                extracted_pages.extend(extract_scanned_pdf_text(data, missing_page_numbers))
+            return sorted(extracted_pages, key=lambda item: item[0])
         document = DocxDocument(BytesIO(data))
         text = "\n".join(p.text for p in document.paragraphs if p.text.strip())
         return [(1, text)] if text.strip() else []
