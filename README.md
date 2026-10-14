@@ -135,7 +135,7 @@ pytest -q
 GitHub Actions juga menjalankan backend tests dan frontend build pada push/pull request ke branch `main`.
 
 ## Ollama
-Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Default konfigurasi model adalah `llama3` dan embedding `nomic-embed-text`. Saat backend berjalan di Docker, URL default mengarah ke host melalui `host.docker.internal:11434`; sesuaikan pada lingkungan yang tidak mendukung hostname tersebut.
+Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Default konfigurasi model chat adalah `qwen2.5:3b` dan embedding `nomic-embed-text`. Unduh keduanya sebelum pengujian dengan `ollama pull qwen2.5:3b` dan `ollama pull nomic-embed-text`. Model 3B dipilih sebagai titik awal yang lebih ringan, tetapi penggunaan pada VPS RAM 4 GB tetap perlu diuji karena model, PostgreSQL, dan API berbagi memori. Saat backend berjalan di Docker, URL default mengarah ke host melalui `host.docker.internal:11434`; sesuaikan pada lingkungan yang tidak mendukung hostname tersebut.
 
 ## Keamanan
 - Jangan commit file `.env`, kredensial, uploads, atau hasil pemrosesan.
