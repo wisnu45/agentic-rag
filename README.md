@@ -276,7 +276,7 @@ Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Defaul
 - Token JWT singkat disimpan di memori frontend, bukan localStorage; refresh browser memerlukan login ulang.
 - SQL Agent nantinya harus memakai koneksi read-only, allowlist tabel/kolom, timeout, dan validasi query.
 - Dokumen dari RAG adalah data tidak tepercaya, bukan instruksi.
-- Hardening production, TLS, autentikasi, backup, dan observability masih perlu dikerjakan.
+- Hardening production, TLS, rate limiting login, audit log, pencabutan token, backup, dan observability masih perlu dikerjakan.
 
 ## Tahapan implementasi
 
