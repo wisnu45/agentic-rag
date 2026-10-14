@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     upload_dir: str = "../storage/uploads"
     processed_dir: str = "../storage/processed"
     file_encryption_key: str = ""
+    jwt_secret_key: str = ""
+    jwt_access_token_minutes: int = 30
     max_upload_size_mb: int = 20
     chunk_size: int = 1000
     chunk_overlap: int = 150
