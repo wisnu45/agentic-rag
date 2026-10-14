@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
-import { askQuestion, getHealth, uploadDocument } from "./services/api";
+import { askQuestion, getHealth, login, logout, uploadDocument } from "./services/api";
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState("checking");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [identity, setIdentity] = useState(null);
+  const [authError, setAuthError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
@@ -16,7 +21,7 @@ export default function App() {
     getHealth().then(() => setApiStatus("online")).catch(() => setApiStatus("offline"));
   }, []);
 
-  async function handleUpload(event) {
+  async function handleLogin(event) {\n    event.preventDefault();\n    if (loggingIn) return;\n    setLoggingIn(true);\n    setAuthError("");\n    try {\n      const user = await login(username.trim(), password);\n      setIdentity(user);\n      setPassword("");\n    } catch (err) {\n      setIdentity(null);\n      setAuthError(err?.response?.data?.detail || "Login gagal. Periksa username, password, dan konfigurasi JWT.");\n    } finally {\n      setLoggingIn(false);\n    }\n  }\n\n  function handleLogout() {\n    logout();\n    setIdentity(null);\n    setUploadResult(null);\n    setChatResponse(null);\n  }\n\n  async function handleUpload(event) {
     event.preventDefault();
     const form = event.currentTarget;
     if (!file || uploading) return;
@@ -64,6 +69,26 @@ export default function App() {
           </span>
         </header>
 
+        <section className="my-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+          {identity ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-slate-300">Login sebagai <span className="font-semibold text-cyan-200">{identity.username}</span> · role <span className="font-semibold">{identity.role}</span></p>
+              <button type="button" onClick={handleLogout} className="rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800">Keluar</button>
+            </div>
+          ) : (
+            <form onSubmit={handleLogin} className="grid gap-3 sm:grid-cols-3">
+              <div className="sm:col-span-3">
+                <h2 className="font-semibold">Login</h2>
+                <p className="mt-1 text-xs text-slate-400">Masuk menggunakan akun yang dibuat oleh administrator.</p>
+              </div>
+              <input aria-label="Username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required minLength={3} maxLength={80} placeholder="Username" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-600" />
+              <input aria-label="Password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required placeholder="Password" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-600" />
+              <button type="submit" disabled={loggingIn || apiStatus === "offline"} className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40">{loggingIn ? "Memeriksa..." : "Masuk"}</button>
+              {authError && <p role="alert" className="sm:col-span-3 rounded-lg border border-rose-900 bg-rose-950/50 p-3 text-sm text-rose-300">{authError}</p>}
+            </form>
+          )}
+        </section>
+
         <section className="grid flex-1 content-center gap-6 py-10 lg:grid-cols-2">
           <form onSubmit={handleUpload} className="h-fit rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
             <h2 className="font-semibold">1. Upload dokumen</h2>
@@ -77,8 +102,8 @@ export default function App() {
               setUploadResult(null);
               setUploadError("");
             }} />
-            <button type="submit" disabled={!file || uploading || apiStatus === "offline"} className="mt-4 w-full rounded-lg bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40">
-              {uploading ? "Memproses dokumen..." : "Upload dan indeks"}
+            <button type="submit" disabled={!identity || !["admin", "editor"].includes(identity.role) || !file || uploading || apiStatus === "offline"} className="mt-4 w-full rounded-lg bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40">
+              {!identity ? "Login untuk upload" : !["admin", "editor"].includes(identity.role) ? "Role tidak memiliki akses upload" : uploading ? "Memproses dokumen..." : "Upload dan indeks"}
             </button>
             {uploadError && <p role="alert" className="mt-4 rounded-lg border border-rose-900 bg-rose-950/50 p-3 text-sm text-rose-300">{uploadError}</p>}
             {uploadResult && <div role="status" className="mt-4 rounded-lg border border-emerald-900 bg-emerald-950/40 p-3 text-sm">
@@ -94,8 +119,8 @@ export default function App() {
             <p className="mt-1 text-xs text-slate-400">Jawaban dirangkai oleh LLM berdasarkan chunk yang paling relevan.</p>
             <label htmlFor="question" className="mt-5 block text-sm text-slate-300">Pertanyaan</label>
             <textarea id="question" value={query} onChange={(event) => setQuery(event.target.value)} rows={3} maxLength={10000} placeholder="Contoh: Apa kebijakan keamanan yang disebutkan?" className="mt-2 w-full resize-y rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm outline-none focus:border-cyan-600" />
-            <button type="submit" disabled={!query.trim() || asking || apiStatus === "offline"} className="mt-3 w-full rounded-lg border border-cyan-800 bg-cyan-950/50 px-4 py-3 text-sm font-semibold text-cyan-200 hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:opacity-40">
-              {asking ? "Menyusun jawaban..." : "Tanyakan"}
+            <button type="submit" disabled={!identity || !query.trim() || asking || apiStatus === "offline"} className="mt-3 w-full rounded-lg border border-cyan-800 bg-cyan-950/50 px-4 py-3 text-sm font-semibold text-cyan-200 hover:bg-cyan-900/50 disabled:cursor-not-allowed disabled:opacity-40">
+              {!identity ? "Login untuk bertanya" : asking ? "Menyusun jawaban..." : "Tanyakan"}
             </button>
             {chatError && <p role="alert" className="mt-4 rounded-lg border border-rose-900 bg-rose-950/50 p-3 text-sm text-rose-300">{chatError}</p>}
             {chatResponse && <div className="mt-4 space-y-3">
