@@ -4,7 +4,7 @@ import mimetypes
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
@@ -90,7 +90,10 @@ def current_identity(user: User = Depends(get_current_user)) -> dict[str, str]:
     status_code=status.HTTP_201_CREATED,
     tags=["documents"],
 )
-def upload_document(\n    file: UploadFile = File(...),\n    _user: User = Depends(require_roles("admin", "editor")),\n) -> DocumentUploadResponse:
+def upload_document(
+    file: UploadFile = File(...),
+    _user: User = Depends(require_roles("admin", "editor")),
+) -> DocumentUploadResponse:
     """Upload, extract, chunk, embed, and index a supported document.
 
     Supports TXT, Markdown, PDF, DOCX, and raster images. Scanned PDFs and
@@ -209,7 +212,9 @@ def upload_document(\n    file: UploadFile = File(...),\n    _user: User = Depen
 
 
 @app.post("/api/search", response_model=SearchResponse, tags=["retrieval"])
-def search_documents(\n    payload: SearchRequest, _user: User = Depends(get_current_user)\n) -> SearchResponse:
+def search_documents(
+    payload: SearchRequest, _user: User = Depends(get_current_user)
+) -> SearchResponse:
     """Retrieve the most similar indexed chunks using cosine distance."""
     try:
         query_embedding = embed_text(payload.query)
@@ -250,7 +255,9 @@ def search_documents(\n    payload: SearchRequest, _user: User = Depends(get_cur
 
 
 @app.post("/api/chat", response_model=ChatResponse, tags=["rag"])
-def chat_with_documents(\n    payload: ChatRequest, _user: User = Depends(get_current_user)\n) -> ChatResponse:
+def chat_with_documents(
+    payload: ChatRequest, _user: User = Depends(get_current_user)
+) -> ChatResponse:
     """Answer a question using retrieved document chunks and source markers."""
     try:
         query_embedding = embed_text(payload.message)
