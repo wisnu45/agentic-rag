@@ -64,6 +64,24 @@ docker compose logs -f frontend
 docker compose down
 ```
 
+## Import skema PostgreSQL secara manual
+
+Skema SQL siap impor tersedia di `database/schema.sql`. Script ini sesuai dengan tabel ORM utama dan memakai pgvector dengan embedding 768 dimensi. Jalankan hanya pada database baru/kosong, atau tinjau objek yang sudah ada sebelum mengimpor.
+
+**Melalui DBeaver**
+1. Hubungkan DBeaver ke database PostgreSQL tujuan.
+2. Pilih database, lalu buka SQL Editor.
+3. Buka file `database/schema.sql` dari repository.
+4. Jalankan seluruh script.
+5. Refresh `Schemas → public → Tables`, lalu pastikan tabel `users`, `documents`, dan `document_chunks` tersedia.
+
+**Melalui terminal**
+```bash
+psql -h localhost -U agentic_rag_app -d agentic_rag -v ON_ERROR_STOP=1 -f database/schema.sql
+```
+
+Pastikan ekstensi pgvector sudah terpasang pada server PostgreSQL dan akun database memiliki izin untuk membuat ekstensi. Script membuat struktur tabel dan indeks saja; script tidak membuat akun admin, tidak mengisi dokumen, dan tidak memindahkan data dari Google AI Studio. Untuk deployment Docker, backend juga memiliki `backend/init_db.py` yang menginisialisasi ekstensi dan tabel berdasarkan model ORM.
+
 ## OCR untuk PDF scan dan gambar (opsional)
 
 Ekstraksi teks standar tetap digunakan untuk halaman PDF yang memiliki text layer. Jika satu atau beberapa halaman tidak memiliki teks yang bisa diekstrak, hanya halaman tersebut yang dirender dan diproses dengan PaddleOCR; teks dari halaman yang sudah terbaca tetap dipertahankan. File PNG, JPG/JPEG, TIFF, dan BMP juga diarahkan ke OCR. Nomor halaman PDF dipertahankan pada hasil ekstraksi.
