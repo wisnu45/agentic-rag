@@ -1,9 +1,9 @@
 # Agentic RAG — Local AI System
 
-Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, SQLAlchemy, PostgreSQL + pgvector, Ollama, dan PaddleOCR**. LangChain, OCR pipeline, retrieval, dan agent tools akan diintegrasikan bertahap.
+Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, SQLAlchemy, PostgreSQL + pgvector, dan Ollama**. PaddleOCR, LangChain, agent tools, autentikasi, dan deployment production masih menjadi tahapan lanjutan.
 
 ## Status
-Repository sudah memiliki fondasi aplikasi, Docker Compose, health checks, CI awal, serta model metadata dokumen dan chunk vector. Pipeline ingest, embedding, OCR, chat/RAG, autentikasi, dan deployment production belum selesai.
+Fondasi aplikasi, Docker Compose, health checks, model dokumen/chunk, ingest teks, embedding, semantic search, dan endpoint RAG berbasis Ollama sudah ditambahkan. OCR untuk dokumen scan, orchestration agent, autentikasi, dan deployment production belum selesai.
 
 ## Struktur utama
 - `frontend/`: ViteJS + React + TailwindCSS
@@ -61,7 +61,7 @@ curl -X POST http://localhost:8000/api/documents \
   -F "file=@./contoh.pdf"
 ```
 
-Persyaratan: database schema sudah diinisialisasi dan Ollama sedang berjalan dengan model embedding yang dikonfigurasi. PDF hasil scan dan gambar belum diproses OCR. Pipeline retrieval dan chat belum tersedia pada tahap ini.
+Persyaratan: database schema sudah diinisialisasi dan Ollama berjalan dengan model embedding yang dikonfigurasi. PDF hasil scan dan gambar belum diproses OCR.
 
 ## Semantic search
 
@@ -73,7 +73,19 @@ curl -X POST http://localhost:8000/api/search \
   -d '{"query":"Apa isi dokumen ini?","top_k":5}'
 ```
 
-Hasil berisi teks chunk, nama file, nomor halaman bila tersedia, dan skor kemiripan cosine (bukan probabilitas). Ini adalah retrieval semantik; jawaban LLM dengan sitasi dan orkestrasi agent akan ditambahkan pada tahap berikutnya.
+Hasil berisi teks chunk, nama file, nomor halaman bila tersedia, dan skor kemiripan cosine (bukan probabilitas).
+
+## Tanya dokumen dengan RAG
+
+Endpoint `POST /api/chat` mengambil lima chunk terdekat dari pgvector, lalu meminta model Ollama menyusun jawaban berdasarkan konteks yang ditemukan. Instruksi model mengharuskan penggunaan penanda sumber seperti `[S1]` dan memperlakukan isi dokumen sebagai data, bukan instruksi.
+
+```bash
+curl -X POST http://localhost:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"demo","message":"Apa poin penting dari dokumen?"}'
+```
+
+Response berisi jawaban, metode retrieval yang digunakan, dan daftar sumber yang disertakan ke model. Validasi sitasi tetap diperlukan. Endpoint ini adalah RAG dasar; belum merupakan agent yang dapat memilih dan menjalankan banyak tools, dan belum memakai n8n.
 
 ## Inisialisasi schema pgvector
 Setelah database tersedia, jalankan sekali dari root repository:
