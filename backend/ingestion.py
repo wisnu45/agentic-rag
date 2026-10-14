@@ -10,7 +10,8 @@ from config import get_settings
 from models import EMBEDDING_DIMENSIONS
 
 settings = get_settings()
-ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
+ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"} | IMAGE_EXTENSIONS
 
 
 class IngestionError(Exception):
@@ -18,7 +19,7 @@ class IngestionError(Exception):
 
 
 def extract_pages(filename: str, data: bytes) -> list[tuple[int, str]]:
-    """Extract text from supported text-based documents; OCR is a later stage."""
+    """Extract text from supported documents, falling back to OCR for scans."""
     suffix = Path(filename).suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:
         raise IngestionError("Unsupported file type.")
@@ -26,6 +27,9 @@ def extract_pages(filename: str, data: bytes) -> list[tuple[int, str]]:
         if suffix in {".txt", ".md"}:
             text = data.decode("utf-8-sig")
             return [(1, text)] if text.strip() else []
+        if suffix in IMAGE_EXTENSIONS:
+            from ocr import extract_image_text
+            return extract_image_text(filename, data)
         if suffix == ".pdf":
             reader = PdfReader(BytesIO(data), strict=True)
             pages = []
@@ -33,7 +37,10 @@ def extract_pages(filename: str, data: bytes) -> list[tuple[int, str]]:
                 text = page.extract_text() or ""
                 if text.strip():
                     pages.append((index, text))
-            return pages
+            if pages:
+                return pages
+            from ocr import extract_scanned_pdf_text
+            return extract_scanned_pdf_text(data)
         document = DocxDocument(BytesIO(data))
         text = "\n".join(p.text for p in document.paragraphs if p.text.strip())
         return [(1, text)] if text.strip() else []
