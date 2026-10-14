@@ -1,48 +1,66 @@
 # Agentic RAG — Local AI System
 
-Baseline development mengikuti spesifikasi proyek: **ViteJS + React, FastAPI, LangChain, PostgreSQL + pgvector, PaddleOCR, dan Ollama**.
+Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, LangChain (tahap integrasi berikutnya), Ollama, PaddleOCR (tahap integrasi berikutnya), dan PostgreSQL + pgvector**.
 
 ## Status
-Fondasi awal repository sudah tersedia. Fitur RAG, OCR, SQL Tool, agent orchestration, autentikasi, dan deployment production akan diimplementasikan bertahap setelah infrastruktur dasar tervalidasi.
+Fondasi aplikasi, health checks, Docker Compose, dan CI awal sudah tersedia. Pipeline RAG, OCR, agent tools, autentikasi, dan deployment production belum selesai.
 
 ## Struktur
 - `frontend/`: ViteJS + React + TailwindCSS
-- `backend/`: FastAPI
+- `backend/`: FastAPI dan SQLAlchemy
 - `storage/uploads/`: file upload lokal (tidak di-commit)
 - `storage/processed/`: hasil pemrosesan lokal (tidak di-commit)
-- `docker-compose.yml`: PostgreSQL dengan pgvector
+- `docker-compose.yml`: PostgreSQL + pgvector, FastAPI, dan frontend Nginx
 - `.env.example`: template konfigurasi; salin menjadi `.env`
+- `.github/workflows/ci.yml`: backend test dan frontend build
 
-## Prasyarat development
-- Python 3.10+
-- Node.js LTS dan npm
+## Prasyarat
 - Docker Desktop dengan Docker Compose
-- Ollama (dapat dijalankan di host lokal)
 - Git
+- Untuk pengembangan tanpa Docker: Python 3.11+, Node.js 20+, dan npm
+- Ollama lokal untuk tahap integrasi model; model disesuaikan dengan kapasitas perangkat
 
-## Setup awal
-Dari root repository, salin template environment:
+## Jalankan seluruh aplikasi dengan Docker
+Dari root repository:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Edit `.env` dan ubah `POSTGRES_PASSWORD` serta `DATABASE_URL` dengan password yang sama. Jangan commit `.env`.
+Buka `.env`, ganti `POSTGRES_PASSWORD` dengan password lokal yang kuat (gunakan karakter alfanumerik untuk menghindari masalah URL encoding), dan samakan password di `DATABASE_URL` untuk menjalankan backend langsung dari host. Docker Compose menyusun URL database internalnya sendiri.
 
-## Menjalankan database
+Kemudian jalankan:
+
 ```bash
-docker compose up -d postgres
+docker compose up --build -d
 docker compose ps
 ```
 
-Verifikasi extension pgvector:
+Akses:
+- Frontend: http://localhost:8080
+- API langsung: http://localhost:8000
+- Dokumentasi API: http://localhost:8000/docs
+- Liveness: http://localhost:8000/health
+- Readiness database: http://localhost:8000/health/ready
+
+Log layanan:
 ```bash
-docker compose exec postgres psql -U agentic_rag_app -d agentic_rag -c "CREATE EXTENSION IF NOT EXISTS vector;"
+docker compose logs -f backend
+docker compose logs -f frontend
 ```
 
-## Menjalankan backend
-Windows PowerShell, dari root repository:
+Matikan layanan:
+```bash
+docker compose down
+```
 
+Data PostgreSQL tetap tersimpan di named volume. Untuk menghapus volume database secara permanen, jangan gunakan `-v` kecuali memang ingin menghapus data.
+
+## Menjalankan tanpa Docker (development)
+### Database
+Pastikan PostgreSQL + pgvector berjalan, lalu konfigurasi `DATABASE_URL` di `.env`.
+
+### Backend (PowerShell)
 ```powershell
 cd backend
 py -m venv .venv
@@ -52,34 +70,30 @@ pip install -r requirements.txt
 uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Health check: http://127.0.0.1:8000/health  
-API docs: http://127.0.0.1:8000/docs
-
-## Menjalankan frontend
-Di terminal terpisah, dari root repository:
-
-```bash
+### Frontend (terminal terpisah)
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-Frontend: http://localhost:5173
+Frontend development: http://localhost:5173
 
 ## Ollama
-Install Ollama sesuai OS dari situs resminya, lalu pilih model yang sesuai dengan kapasitas RAM/VRAM lokal. Jangan mengasumsikan model 8B cocok untuk VPS 2 vCPU / RAM 4 GB.
+Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Saat backend berjalan di Docker, konfigurasi default mengakses host melalui `host.docker.internal:11434`. Pada lingkungan yang tidak mendukung hostname tersebut, sesuaikan `OLLAMA_BASE_URL`.
 
 ## Keamanan
 - Jangan commit file `.env`, kredensial, uploads, atau hasil pemrosesan.
-- SQL Agent nantinya wajib menggunakan koneksi read-only, allowlist tabel/kolom, timeout, dan validasi query.
-- Jangan mengekspos port PostgreSQL ke internet pada production.
-- Dokumen yang diambil dari RAG diperlakukan sebagai data tidak tepercaya, bukan instruksi.
-- Password dan secrets harus diganti sebelum penggunaan bersama/production.
+- PostgreSQL diikat ke localhost; jangan ekspos port database ke internet.
+- Ganti secrets sebelum penggunaan bersama/production.
+- SQL Agent nantinya wajib memakai koneksi read-only, allowlist tabel/kolom, timeout, dan validasi query.
+- Dokumen dari RAG harus diperlakukan sebagai data tidak tepercaya, bukan instruksi.
+- Dockerfile saat ini untuk fondasi development; hardening production, TLS, autentikasi, dan observability masih perlu dikerjakan.
 
-## Tahapan
-1. Fondasi repository dan database.
-2. Backend API dan koneksi database.
-3. Pipeline ingest dokumen, embedding, dan RAG.
-4. OCR dan agent tools.
-5. Frontend chat dan upload.
-6. Testing keamanan serta deployment VPS.
+## Tahapan implementasi
+1. Fondasi repository, Docker, health checks, dan CI.
+2. Skema metadata dokumen serta koneksi pgvector.
+3. Pipeline ingest dokumen, chunking, embedding, dan retrieval.
+4. OCR dengan PaddleOCR dan agent tools.
+5. Frontend chat/upload dan sitasi sumber.
+6. Pengujian keamanan dan deployment VPS.
