@@ -3,7 +3,7 @@
 Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, SQLAlchemy, PostgreSQL + pgvector, dan Ollama**. PaddleOCR tersedia sebagai dependensi opsional; agent tools, autentikasi, dan deployment production masih menjadi tahapan lanjutan.
 
 ## Status
-Fondasi aplikasi, Docker Compose, health checks, model dokumen/chunk, ingest teks, embedding, semantic search, endpoint RAG berbasis Ollama, dan enkripsi file AES-256-GCM sudah ditambahkan. Fallback OCR untuk PDF hasil scan dan gambar sudah ditambahkan sebagai modul opsional, tetapi pemasangan dependensi dan pengujian performa OCR di perangkat target belum diverifikasi. Orchestration agent, autentikasi, enkripsi metadata database, dan deployment production belum selesai.
+Fondasi aplikasi, Docker Compose, health checks, model dokumen/chunk, ingest teks, embedding, semantic search, endpoint RAG berbasis Ollama, dan enkripsi file AES-256-GCM sudah ditambahkan. Fallback OCR untuk PDF hasil scan, halaman scan campuran, dan gambar sudah ditambahkan sebagai modul opsional, tetapi pemasangan dependensi dan pengujian performa OCR di perangkat target belum diverifikasi. Orchestration agent, autentikasi, enkripsi metadata database, dan deployment production belum selesai.
 
 ## Struktur utama
 - `frontend/`: ViteJS + React + TailwindCSS
@@ -62,7 +62,7 @@ docker compose down
 
 ## OCR untuk PDF scan dan gambar (opsional)
 
-Ekstraksi teks standar tetap digunakan untuk PDF yang sudah memiliki text layer. Jika PDF tidak memiliki teks yang bisa diekstrak, pipeline mencoba merender halaman PDF lalu menjalankan PaddleOCR. File PNG, JPG/JPEG, TIFF, dan BMP juga diarahkan ke OCR. Nomor halaman PDF dipertahankan pada hasil ekstraksi.
+Ekstraksi teks standar tetap digunakan untuk halaman PDF yang memiliki text layer. Jika satu atau beberapa halaman tidak memiliki teks yang bisa diekstrak, hanya halaman tersebut yang dirender dan diproses dengan PaddleOCR; teks dari halaman yang sudah terbaca tetap dipertahankan. File PNG, JPG/JPEG, TIFF, dan BMP juga diarahkan ke OCR. Nomor halaman PDF dipertahankan pada hasil ekstraksi.
 
 OCR sengaja tidak dipasang pada image default karena dependensinya besar dan inferensi CPU dapat menambah waktu serta konsumsi RAM. Untuk mengaktifkannya, ubah `INSTALL_OCR=true` di `.env`, lalu build ulang:
 
