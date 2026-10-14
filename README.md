@@ -1,14 +1,16 @@
 # Agentic RAG — Local AI System
 
-Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, SQLAlchemy, PostgreSQL + pgvector, dan Ollama**. PaddleOCR, LangChain, agent tools, autentikasi, dan deployment production masih menjadi tahapan lanjutan.
+Baseline teknologi: **ViteJS + React + TailwindCSS, FastAPI, SQLAlchemy, PostgreSQL + pgvector, dan Ollama**. PaddleOCR tersedia sebagai dependensi opsional; agent tools, autentikasi, dan deployment production masih menjadi tahapan lanjutan.
 
 ## Status
-Fondasi aplikasi, Docker Compose, health checks, model dokumen/chunk, ingest teks, embedding, semantic search, endpoint RAG berbasis Ollama, dan enkripsi file AES-256-GCM sudah ditambahkan. OCR untuk dokumen scan, orchestration agent, autentikasi, enkripsi metadata database, dan deployment production belum selesai.
+Fondasi aplikasi, Docker Compose, health checks, model dokumen/chunk, ingest teks, embedding, semantic search, endpoint RAG berbasis Ollama, dan enkripsi file AES-256-GCM sudah ditambahkan. Fallback OCR untuk PDF hasil scan dan gambar sudah ditambahkan sebagai modul opsional, tetapi pemasangan dependensi dan pengujian performa OCR di perangkat target belum diverifikasi. Orchestration agent, autentikasi, enkripsi metadata database, dan deployment production belum selesai.
 
 ## Struktur utama
 - `frontend/`: ViteJS + React + TailwindCSS
-- `backend/`: FastAPI, konfigurasi, SQLAlchemy, model dokumen, dan perintah inisialisasi DB
+- `backend/`: FastAPI, konfigurasi, SQLAlchemy, model dokumen, ekstraksi teks, dan OCR opsional
 - `backend/models.py`: tabel `documents` dan `document_chunks`; embedding disiapkan untuk 768 dimensi `nomic-embed-text`
+- `backend/ocr.py`: PaddleOCR CPU-only untuk raster image dan PDF hasil scan; dependensi dimuat secara lazy
+- `backend/requirements-ocr.txt`: paket tambahan khusus OCR, terpisah dari requirements inti
 - `backend/init_db.py`: inisialisasi extension pgvector dan tabel awal
 - `docker-compose.yml`: PostgreSQL + pgvector, FastAPI, dan frontend Nginx
 - `.github/workflows/ci.yml`: backend tests dan frontend build
@@ -58,9 +60,38 @@ docker compose logs -f frontend
 docker compose down
 ```
 
+## OCR untuk PDF scan dan gambar (opsional)
+
+Ekstraksi teks standar tetap digunakan untuk PDF yang sudah memiliki text layer. Jika PDF tidak memiliki teks yang bisa diekstrak, pipeline mencoba merender halaman PDF lalu menjalankan PaddleOCR. File PNG, JPG/JPEG, TIFF, dan BMP juga diarahkan ke OCR. Nomor halaman PDF dipertahankan pada hasil ekstraksi.
+
+OCR sengaja tidak dipasang pada image default karena dependensinya besar dan inferensi CPU dapat menambah waktu serta konsumsi RAM. Untuk mengaktifkannya, ubah `INSTALL_OCR=true` di `.env`, lalu build ulang:
+
+```bash
+docker compose build --no-cache backend
+docker compose up -d backend
+```
+
+Untuk instalasi backend langsung dari host:
+
+```powershell
+cd backend
+pip install -r requirements-ocr.txt
+```
+
+PaddleOCR dikonfigurasi untuk CPU dan model bahasa Latin (`lang="en"`) sebagai baseline. Akurasi untuk dokumen bahasa Indonesia, tabel, tulisan buram, dan tata letak kompleks perlu dievaluasi menggunakan sampel dokumen nyata. OCR tidak menjamin hasil sempurna. **Pada VPS 2 vCPU/4 GB RAM, jangan mengaktifkan OCR sebelum mengukur penggunaan memori dan waktu proses**; sebaiknya lakukan benchmark pada mesin pengembangan terlebih dahulu. Dependensi OCR dan model mungkin menambah ukuran image serta waktu build.
+
+Contoh upload gambar melalui API:
+
+```bash
+curl -X POST http://localhost:8000/api/documents \
+  -F "file=@./scan.jpg"
+```
+
+Jika paket OCR belum dipasang, endpoint akan mengembalikan pesan yang menjelaskan bahwa dependensi opsional diperlukan.
+
 ## Upload dan ingest dokumen
 
-Endpoint `POST /api/documents` menerima file TXT, Markdown, PDF berbasis teks, dan DOCX. Endpoint menghitung SHA-256 untuk mencegah upload ulang konten yang sama, mengekstrak teks, membuat chunk ber-overlap, meminta embedding ke Ollama, lalu menyimpan metadata dan vector ke PostgreSQL + pgvector.
+Endpoint `POST /api/documents` menerima file TXT, Markdown, PDF, DOCX, serta gambar raster yang didukung. Endpoint menghitung SHA-256 untuk mencegah upload ulang konten yang sama, mengekstrak teks (OCR bila diperlukan dan tersedia), membuat chunk ber-overlap, meminta embedding ke Ollama, lalu menyimpan metadata dan vector ke PostgreSQL + pgvector.
 
 Contoh dengan curl:
 
@@ -69,7 +100,7 @@ curl -X POST http://localhost:8000/api/documents \
   -F "file=@./contoh.pdf"
 ```
 
-Persyaratan: database schema sudah diinisialisasi dan Ollama berjalan dengan model embedding yang dikonfigurasi. PDF hasil scan dan gambar belum diproses OCR.
+Persyaratan: database schema sudah diinisialisasi dan Ollama berjalan dengan model embedding yang dikonfigurasi.
 
 ## Semantic search
 
@@ -96,6 +127,7 @@ curl -X POST http://localhost:8000/api/chat \
 Response berisi jawaban, metode retrieval yang digunakan, dan daftar sumber yang disertakan ke model. Validasi sitasi tetap diperlukan. Endpoint ini adalah RAG dasar; belum merupakan agent yang dapat memilih dan menjalankan banyak tools, dan belum memakai n8n.
 
 ## Inisialisasi schema pgvector
+
 Setelah database tersedia, jalankan sekali dari root repository:
 
 ```bash
@@ -109,6 +141,7 @@ Perintah ini membuat extension `vector` dan tabel awal. Tabel yang dibuat:
 Dimensi embedding awal disetel ke 768 untuk `nomic-embed-text`. Jika model embedding diganti, sesuaikan dimensi sebelum menyimpan vector dari model baru.
 
 ## Menjalankan backend tanpa Docker
+
 Pastikan PostgreSQL + pgvector tersedia dan `DATABASE_URL` pada `.env` sesuai.
 
 ```powershell
@@ -122,6 +155,7 @@ uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 ## Menjalankan frontend tanpa Docker
+
 Terminal terpisah:
 
 ```powershell
@@ -133,6 +167,7 @@ npm run dev
 Frontend development: http://localhost:5173
 
 ## Tes backend
+
 Dari folder `backend`:
 
 ```bash
@@ -140,12 +175,14 @@ pip install pytest
 pytest -q
 ```
 
-GitHub Actions juga menjalankan backend tests dan frontend build pada push/pull request ke branch `main`.
+GitHub Actions juga menjalankan backend tests dan frontend build pada push/pull request ke branch `main`. Status tes harus dicek dari hasil workflow aktual; perubahan kode tidak dianggap tervalidasi hanya karena sudah di-commit.
 
 ## Ollama
+
 Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Default konfigurasi model chat adalah `qwen2.5:3b` dan embedding `nomic-embed-text`. Unduh keduanya sebelum pengujian dengan `ollama pull qwen2.5:3b` dan `ollama pull nomic-embed-text`. Model 3B dipilih sebagai titik awal yang lebih ringan, tetapi penggunaan pada VPS RAM 4 GB tetap perlu diuji karena model, PostgreSQL, dan API berbagi memori. Saat backend berjalan di Docker, URL default mengarah ke host melalui `host.docker.internal:11434`; sesuaikan pada lingkungan yang tidak mendukung hostname tersebut.
 
 ## Keamanan
+
 - Jangan commit file `.env`, kredensial, uploads, atau hasil pemrosesan.
 - File asli yang disimpan pada disk dienkripsi dengan AES-256-GCM; metadata dan teks chunk pada PostgreSQL belum dienkripsi pada level aplikasi.
 - Jaga kerahasiaan dan backup `FILE_ENCRYPTION_KEY`; rotasi key memerlukan migrasi file.
@@ -156,9 +193,10 @@ Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Defaul
 - Hardening production, TLS, autentikasi, backup, dan observability masih perlu dikerjakan.
 
 ## Tahapan implementasi
+
 1. Fondasi repository, Docker, health checks, dan CI.
 2. Skema metadata dokumen serta pgvector.
 3. Pipeline ingest dokumen, chunking, embedding, dan retrieval.
 4. Enkripsi file AES-256-GCM dan pengujian dasar.
-5. OCR dengan PaddleOCR dan agent tools.
-6. Autentikasi, otorisasi, pengujian keamanan, serta deployment VPS.
+5. OCR PaddleOCR opsional untuk PDF scan/gambar; benchmark CPU/RAM masih diperlukan.
+6. Agent orchestration/tools, autentikasi, otorisasi, pengujian keamanan, serta deployment VPS.
