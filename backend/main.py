@@ -59,10 +59,10 @@ def readiness_check() -> dict[str, str]:
     tags=["documents"],
 )
 def upload_document(file: UploadFile = File(...)) -> DocumentUploadResponse:
-    """Upload and index a supported text-based document.
+    """Upload, extract, chunk, embed, and index a supported document.
 
-    Supported: TXT, Markdown, text-based PDF, and DOCX. Scanned PDF/image OCR
-    is a separate upcoming step. The endpoint requires PostgreSQL and Ollama.
+    Supports TXT, Markdown, PDF, DOCX, and raster images. Scanned PDFs and
+    images require the optional PaddleOCR dependencies in requirements-ocr.txt.
     """
     original_name = Path(file.filename or "").name
     suffix = Path(original_name).suffix.lower()
@@ -107,7 +107,7 @@ def upload_document(file: UploadFile = File(...)) -> DocumentUploadResponse:
         if not pages:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="No selectable text was found. Scanned documents require the OCR pipeline, which is not enabled yet.",
+                detail="No readable text was found in this file. For scanned PDFs/images, verify the optional PaddleOCR dependencies are installed.",
             )
 
         chunks = chunk_pages(pages)
@@ -176,7 +176,6 @@ def upload_document(file: UploadFile = File(...)) -> DocumentUploadResponse:
         file.file.close()
 
 
-
 @app.post("/api/search", response_model=SearchResponse, tags=["retrieval"])
 def search_documents(payload: SearchRequest) -> SearchResponse:
     """Retrieve the most similar indexed chunks using cosine distance."""
@@ -216,7 +215,6 @@ def search_documents(payload: SearchRequest) -> SearchResponse:
         ) from exc
     finally:
         db.close()
-
 
 
 @app.post("/api/chat", response_model=ChatResponse, tags=["rag"])
