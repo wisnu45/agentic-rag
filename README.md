@@ -28,6 +28,14 @@ Copy-Item .env.example .env
 
 Buka `.env` dan ubah `POSTGRES_PASSWORD` menjadi password lokal yang kuat. Gunakan karakter alfanumerik untuk menghindari masalah URL encoding. Jika menjalankan backend langsung dari host, samakan password di `DATABASE_URL`. Docker Compose membentuk URL internal database sendiri.
 
+Generate key enkripsi AES-256-GCM yang unik, lalu masukkan hasilnya ke `FILE_ENCRYPTION_KEY` di file `.env`:
+
+```powershell
+py -c "import secrets,base64; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
+```
+
+Jangan commit atau membagikan key tersebut. Simpan cadangan key di pengelola rahasia yang aman. **Jika key hilang, file yang tersimpan terenkripsi tidak dapat dipulihkan.** Jangan mengganti key setelah ada dokumen yang tersimpan kecuali kamu sudah membuat prosedur re-enkripsi.
+
 Kemudian:
 
 ```bash
@@ -139,6 +147,8 @@ Install Ollama di host lokal dan unduh model yang sesuai dengan RAM/VRAM. Defaul
 
 ## Keamanan
 - Jangan commit file `.env`, kredensial, uploads, atau hasil pemrosesan.
+- File asli yang disimpan pada disk dienkripsi dengan AES-256-GCM; metadata dan teks chunk pada PostgreSQL belum dienkripsi pada level aplikasi.
+- Jaga kerahasiaan dan backup `FILE_ENCRYPTION_KEY`; rotasi key memerlukan migrasi file.
 - PostgreSQL hanya dipublikasikan ke localhost; jangan ekspos port database ke internet.
 - Ganti secrets sebelum penggunaan bersama/production.
 - SQL Agent nantinya harus memakai koneksi read-only, allowlist tabel/kolom, timeout, dan validasi query.
