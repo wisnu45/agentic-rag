@@ -70,7 +70,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     """Decode the bearer token and load the current user/role from PostgreSQL."""
     settings = get_settings()
     secret = settings.jwt_secret_key.strip()
-    if len(secret) < 32:
+    if len(secret) < 32 or secret.startswith("REPLACE_WITH"):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication is not configured. Set JWT_SECRET_KEY.",
