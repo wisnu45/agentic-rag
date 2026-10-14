@@ -29,3 +29,18 @@ def test_access_token_requires_configured_secret(monkeypatch):
 def test_role_allowlist_rejects_unknown_role():
     with pytest.raises(ValueError, match="role allowlist"):
         auth.require_roles("superuser")
+
+
+def test_access_token_contains_subject_and_expiration(monkeypatch):
+    import jwt
+
+    secret = "test-secret-value-with-at-least-32-characters"
+    monkeypatch.setattr(
+        auth,
+        "get_settings",
+        lambda: type("Settings", (), {"jwt_secret_key": secret, "jwt_access_token_minutes": 30})(),
+    )
+    token = auth.create_access_token("demo-user")
+    claims = jwt.decode(token, secret, algorithms=["HS256"])
+    assert claims["sub"] == "demo-user"
+    assert claims["exp"] > claims["iat"]
