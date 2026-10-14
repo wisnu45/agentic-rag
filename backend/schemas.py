@@ -1,4 +1,4 @@
-"""Pydantic schemas for initial API endpoints."""
+"""Pydantic schemas for API endpoints."""
 from pydantic import BaseModel, Field
 
 
@@ -16,3 +16,11 @@ class ChatResponse(BaseModel):
     answer: str
     tool_used: str = "none"
     sources: list[dict[str, str]] = Field(default_factory=list)
+
+
+class DocumentUploadResponse(BaseModel):
+    document_id: str
+    filename: str
+    status: str
+    chunks_created: int
+    message: str
