@@ -1,8 +1,9 @@
 """Initial FastAPI application for Agentic RAG."""
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
+from database import check_database_connection
 from schemas import HealthResponse
 
 settings = get_settings()
@@ -24,5 +25,18 @@ app.add_middleware(
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
 def health_check() -> HealthResponse:
-    """Basic liveness endpoint; does not yet verify database or model connectivity."""
+    """Liveness endpoint; does not require dependent services."""
     return HealthResponse()
+
+
+@app.get("/health/ready", tags=["system"])
+def readiness_check() -> dict[str, str]:
+    """Readiness endpoint verifies PostgreSQL connectivity."""
+    try:
+        check_database_connection()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database is not available",
+        ) from exc
+    return {"status": "ready", "database": "connected"}
