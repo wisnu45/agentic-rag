@@ -9,6 +9,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
+ARG INSTALL_OCR=false
+COPY requirements-ocr.txt .
+RUN if [ "$INSTALL_OCR" = "true" ]; then \
+      pip install --no-cache-dir -r requirements-ocr.txt; \
+    fi
+
 COPY . .
 
 EXPOSE 8000
