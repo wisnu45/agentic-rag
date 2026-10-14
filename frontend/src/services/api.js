@@ -19,3 +19,9 @@ export async function uploadDocument(file) {
   });
   return response.data;
 }
+
+export async function searchDocuments(query, topK = 5) {
+  const path = (import.meta.env.VITE_API_BASE_URL || "") === "/api" ? "/search" : "/api/search";
+  const response = await api.post(path, { query, top_k: topK }, { timeout: 180000 });
+  return response.data;
+}
