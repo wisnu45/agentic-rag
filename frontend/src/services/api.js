@@ -13,7 +13,7 @@ export async function getHealth() {
 export async function uploadDocument(file) {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await api.post("/api/documents", formData, {
+  const response = await api.post((import.meta.env.VITE_API_BASE_URL || "") === "/api" ? "/documents" : "/api/documents", formData, {
     headers: { "Content-Type": "multipart/form-data" },
     timeout: 180000,
   });
