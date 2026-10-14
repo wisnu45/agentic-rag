@@ -27,7 +27,7 @@ services:
       APP_NAME: ${APP_NAME:-Agentic RAG API}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agentic_rag_app}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-agentic_rag}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-llama3}
+      OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-qwen2.5:3b}
       OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
       UPLOAD_DIR: /app/storage/uploads
