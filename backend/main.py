@@ -4,15 +4,17 @@ import mimetypes
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
+from auth import create_access_token, get_current_user, require_roles, verify_password
 from config import get_settings
 from database import SessionLocal, check_database_connection
 from ingestion import ALLOWED_EXTENSIONS, IngestionError, chunk_pages, embed_text, extract_pages
-from models import Document, DocumentChunk
+from models import Document, DocumentChunk, User
 from rag import RAGGenerationError, generate_answer
 from schemas import ChatRequest, ChatResponse, DocumentUploadResponse, HealthResponse, SearchRequest, SearchResponse, SearchResult
 from security import StorageEncryptionError, encrypt_file
@@ -52,13 +54,43 @@ def readiness_check() -> dict[str, str]:
     return {"status": "ready", "database": "connected"}
 
 
+@app.post("/api/auth/token", tags=["authentication"])
+def login(form_data: OAuth2PasswordRequestForm = Depends()) -> dict[str, str]:
+    """Exchange username/password for a short-lived bearer token."""
+    db = SessionLocal()
+    try:
+        user = db.scalar(select(User).where(User.username == form_data.username, User.is_active.is_(True)))
+        if user is None or not verify_password(form_data.password, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        try:
+            token = create_access_token(user.username)
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication is not configured. Set JWT_SECRET_KEY.",
+            ) from exc
+        return {"access_token": token, "token_type": "bearer"}
+    finally:
+        db.close()
+
+
+@app.get("/api/auth/me", tags=["authentication"])
+def current_identity(user: User = Depends(get_current_user)) -> dict[str, str]:
+    """Return the authenticated username and current role."""
+    return {"username": user.username, "role": user.role}
+
+
 @app.post(
     "/api/documents",
     response_model=DocumentUploadResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["documents"],
 )
-def upload_document(file: UploadFile = File(...)) -> DocumentUploadResponse:
+def upload_document(\n    file: UploadFile = File(...),\n    _user: User = Depends(require_roles("admin", "editor")),\n) -> DocumentUploadResponse:
     """Upload, extract, chunk, embed, and index a supported document.
 
     Supports TXT, Markdown, PDF, DOCX, and raster images. Scanned PDFs and
@@ -177,7 +209,7 @@ def upload_document(file: UploadFile = File(...)) -> DocumentUploadResponse:
 
 
 @app.post("/api/search", response_model=SearchResponse, tags=["retrieval"])
-def search_documents(payload: SearchRequest) -> SearchResponse:
+def search_documents(\n    payload: SearchRequest, _user: User = Depends(get_current_user)\n) -> SearchResponse:
     """Retrieve the most similar indexed chunks using cosine distance."""
     try:
         query_embedding = embed_text(payload.query)
@@ -218,7 +250,7 @@ def search_documents(payload: SearchRequest) -> SearchResponse:
 
 
 @app.post("/api/chat", response_model=ChatResponse, tags=["rag"])
-def chat_with_documents(payload: ChatRequest) -> ChatResponse:
+def chat_with_documents(\n    payload: ChatRequest, _user: User = Depends(get_current_user)\n) -> ChatResponse:
     """Answer a question using retrieved document chunks and source markers."""
     try:
         query_embedding = embed_text(payload.message)
