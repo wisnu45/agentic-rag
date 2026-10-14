@@ -21,7 +21,31 @@ export default function App() {
     getHealth().then(() => setApiStatus("online")).catch(() => setApiStatus("offline"));
   }, []);
 
-  async function handleLogin(event) {\n    event.preventDefault();\n    if (loggingIn) return;\n    setLoggingIn(true);\n    setAuthError("");\n    try {\n      const user = await login(username.trim(), password);\n      setIdentity(user);\n      setPassword("");\n    } catch (err) {\n      setIdentity(null);\n      setAuthError(err?.response?.data?.detail || "Login gagal. Periksa username, password, dan konfigurasi JWT.");\n    } finally {\n      setLoggingIn(false);\n    }\n  }\n\n  function handleLogout() {\n    logout();\n    setIdentity(null);\n    setUploadResult(null);\n    setChatResponse(null);\n  }\n\n  async function handleUpload(event) {
+  async function handleLogin(event) {
+    event.preventDefault();
+    if (loggingIn) return;
+    setLoggingIn(true);
+    setAuthError("");
+    try {
+      const user = await login(username.trim(), password);
+      setIdentity(user);
+      setPassword("");
+    } catch (err) {
+      setIdentity(null);
+      setAuthError(err?.response?.data?.detail || "Login gagal. Periksa username, password, dan konfigurasi JWT.");
+    } finally {
+      setLoggingIn(false);
+    }
+  }
+
+  function handleLogout() {
+    logout();
+    setIdentity(null);
+    setUploadResult(null);
+    setChatResponse(null);
+  }
+
+  async function handleUpload(event) {
     event.preventDefault();
     const form = event.currentTarget;
     if (!file || uploading) return;
