@@ -1,16 +1,24 @@
-"""Initial FastAPI application for Agentic RAG."""
-from fastapi import FastAPI, HTTPException, status
+"""FastAPI application for Agentic RAG."""
+import hashlib
+import mimetypes
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
-from database import check_database_connection
-from schemas import HealthResponse
+from database import SessionLocal, check_database_connection
+from ingestion import ALLOWED_EXTENSIONS, IngestionError, chunk_pages, embed_text, extract_pages
+from models import Document, DocumentChunk
+from schemas import DocumentUploadResponse, HealthResponse
 
 settings = get_settings()
-
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
+    version="0.2.0",
     description="Local-first Agentic RAG API",
 )
 
@@ -40,3 +48,119 @@ def readiness_check() -> dict[str, str]:
             detail="Database is not available",
         ) from exc
     return {"status": "ready", "database": "connected"}
+
+
+@app.post(
+    "/api/documents",
+    response_model=DocumentUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["documents"],
+)
+def upload_document(file: UploadFile = File(...)) -> DocumentUploadResponse:
+    """Upload and index a supported text-based document.
+
+    Supported: TXT, Markdown, text-based PDF, and DOCX. Scanned PDF/image OCR
+    is a separate upcoming step. The endpoint requires PostgreSQL and Ollama.
+    """
+    original_name = Path(file.filename or "").name
+    suffix = Path(original_name).suffix.lower()
+    if not original_name or suffix not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported file type. Allowed extensions: {', '.join(sorted(ALLOWED_EXTENSIONS))}.",
+        )
+
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    data = file.file.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File exceeds the {settings.max_upload_size_mb} MB upload limit.",
+        )
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty.")
+
+    digest = hashlib.sha256(data).hexdigest()
+    storage_root = Path(settings.upload_dir).resolve()
+    storage_root.mkdir(parents=True, exist_ok=True)
+    stored_path = storage_root / f"{uuid4().hex}{suffix}"
+
+    db = SessionLocal()
+    try:
+        existing = db.scalar(select(Document).where(Document.sha256 == digest))
+        if existing:
+            return DocumentUploadResponse(
+                document_id=str(existing.id),
+                filename=existing.filename,
+                status=existing.status,
+                chunks_created=len(existing.chunks),
+                message="This file content has already been uploaded.",
+            )
+
+        try:
+            pages = extract_pages(original_name, data)
+        except IngestionError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+        if not pages:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="No selectable text was found. Scanned documents require the OCR pipeline, which is not enabled yet.",
+            )
+
+        chunks = chunk_pages(pages)
+        if not chunks:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No text chunks could be created.")
+
+        stored_path.write_bytes(data)
+        document = Document(
+            filename=original_name[:255],
+            mime_type=file.content_type or mimetypes.guess_type(original_name)[0],
+            sha256=digest,
+            storage_path=str(stored_path),
+            status="processing",
+            extra_metadata={"extension": suffix, "page_count": len(pages)},
+        )
+        db.add(document)
+        db.flush()
+
+        vector_rows = []
+        try:
+            for index, (page_number, content) in enumerate(chunks):
+                vector_rows.append(
+                    DocumentChunk(
+                        document_id=document.id,
+                        chunk_index=index,
+                        content=content,
+                        embedding=embed_text(content),
+                        page_number=page_number,
+                        extra_metadata={"source_filename": original_name},
+                    )
+                )
+        except IngestionError as exc:
+            db.rollback()
+            stored_path.unlink(missing_ok=True)
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+        db.add_all(vector_rows)
+        document.status = "indexed"
+        db.commit()
+        return DocumentUploadResponse(
+            document_id=str(document.id),
+            filename=document.filename,
+            status=document.status,
+            chunks_created=len(vector_rows),
+            message="Document text extracted, chunked, and embedded successfully.",
+        )
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        db.rollback()
+        stored_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document storage is unavailable. Verify the database schema and connection.",
+        ) from exc
+    finally:
+        db.close()
+        file.file.close()
