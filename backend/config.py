@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Agentic RAG API"
     app_env: str = "development"
-    database_url: str = "postgresql+psycopg://agentic_rag:change-me@localhost:5432/agentic_rag"
+    database_url: str = "postgresql+psycopg://agentic_rag_app:change_me_local_only@localhost:5432/agentic_rag"
     ollama_base_url: str = "http://localhost:11434"
     ollama_llm_model: str = "llama3"
     ollama_embedding_model: str = "nomic-embed-text"
