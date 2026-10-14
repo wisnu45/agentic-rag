@@ -67,12 +67,12 @@ export default function App() {
         <section className="grid flex-1 content-center gap-6 py-10 lg:grid-cols-2">
           <form onSubmit={handleUpload} className="h-fit rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
             <h2 className="font-semibold">1. Upload dokumen</h2>
-            <p className="mt-1 text-xs text-slate-400">TXT, MD, PDF berbasis teks, DOCX · maksimal 20 MB</p>
+            <p className="mt-1 text-xs text-slate-400">TXT, MD, PDF, DOCX, JPG/PNG/TIFF/BMP · maksimal 20 MB</p>
             <label htmlFor="document-file" className="mt-5 flex cursor-pointer flex-col items-center rounded-xl border border-dashed border-slate-700 bg-slate-950/60 px-4 py-8 text-center hover:border-cyan-700">
               <span className="text-sm font-medium">{file ? file.name : "Pilih dokumen dari perangkat"}</span>
               <span className="mt-1 text-xs text-slate-500">File akan diekstrak, di-chunk, dan di-embedding</span>
             </label>
-            <input id="document-file" type="file" accept=".txt,.md,.pdf,.docx" className="sr-only" onChange={(event) => {
+            <input id="document-file" type="file" accept=".txt,.md,.pdf,.docx,.png,.jpg,.jpeg,.tif,.tiff,.bmp" className="sr-only" onChange={(event) => {
               setFile(event.target.files?.[0] || null);
               setUploadResult(null);
               setUploadError("");
@@ -86,7 +86,7 @@ export default function App() {
               <p className="mt-1 text-slate-300">{uploadResult.filename}</p>
               <p className="mt-1 text-xs text-slate-400">Status: {uploadResult.status} · Chunk: {uploadResult.chunks_created}</p>
             </div>}
-            <p className="mt-4 text-xs leading-5 text-slate-500">PDF hasil scan belum didukung. Database dan Ollama harus aktif.</p>
+            <p className="mt-4 text-xs leading-5 text-slate-500">OCR untuk PDF scan/gambar memerlukan dependensi PaddleOCR opsional. Database dan Ollama harus aktif.</p>
           </form>
 
           <form onSubmit={handleAsk} className="h-fit rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
@@ -116,7 +116,7 @@ export default function App() {
           </form>
         </section>
         <footer className="border-t border-slate-800 pt-4 text-xs text-slate-500">
-          MVP • React + FastAPI • PostgreSQL + pgvector • Ollama
+          MVP • React + FastAPI • PostgreSQL + pgvector • Ollama • OCR opsional
         </footer>
       </div>
     </main>
