@@ -63,6 +63,18 @@ curl -X POST http://localhost:8000/api/documents \
 
 Persyaratan: database schema sudah diinisialisasi dan Ollama sedang berjalan dengan model embedding yang dikonfigurasi. PDF hasil scan dan gambar belum diproses OCR. Pipeline retrieval dan chat belum tersedia pada tahap ini.
 
+## Semantic search
+
+Endpoint `POST /api/search` mengubah pertanyaan menjadi embedding melalui Ollama, lalu mencari chunk terdekat dengan cosine distance di pgvector.
+
+```bash
+curl -X POST http://localhost:8000/api/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Apa isi dokumen ini?","top_k":5}'
+```
+
+Hasil berisi teks chunk, nama file, nomor halaman bila tersedia, dan skor kemiripan cosine (bukan probabilitas). Ini adalah retrieval semantik; jawaban LLM dengan sitasi dan orkestrasi agent akan ditambahkan pada tahap berikutnya.
+
 ## Inisialisasi schema pgvector
 Setelah database tersedia, jalankan sekali dari root repository:
 
