@@ -25,3 +25,9 @@ export async function searchDocuments(query, topK = 5) {
   const response = await api.post(path, { query, top_k: topK }, { timeout: 180000 });
   return response.data;
 }
+
+export async function askQuestion(message, sessionId = "web-session") {
+  const path = (import.meta.env.VITE_API_BASE_URL || "") === "/api" ? "/chat" : "/api/chat";
+  const response = await api.post(path, { session_id: sessionId, message }, { timeout: 240000 });
+  return response.data;
+}
