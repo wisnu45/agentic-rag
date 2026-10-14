@@ -16,7 +16,44 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # Keep PostgreSQL bound to localhost for development; do not expose 5432 publicly in production.
+
+  backend:
+    build:
+      context: ./backend
+    container_name: agentic-rag-api
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_NAME: ${APP_NAME:-Agentic RAG API}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agentic_rag_app}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-agentic_rag}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-llama3}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
+      UPLOAD_DIR: /app/storage/uploads
+      PROCESSED_DIR: /app/storage/processed
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./storage/uploads:/app/storage/uploads
+      - ./storage/processed:/app/storage/processed
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: agentic-rag-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
