@@ -66,8 +66,10 @@ def extract_image_text(filename: str, data: bytes) -> list[tuple[int, str]]:
     return [(1, text)] if text else []
 
 
-def extract_scanned_pdf_text(data: bytes) -> list[tuple[int, str]]:
-    """Rasterize PDF pages and OCR each page, preserving 1-based page numbers."""
+def extract_scanned_pdf_text(
+    data: bytes, page_numbers: set[int] | None = None
+) -> list[tuple[int, str]]:
+    """Rasterize PDF pages and OCR selected 1-based pages, preserving page numbers."""
     try:
         import fitz
     except ImportError as exc:
@@ -79,6 +81,8 @@ def extract_scanned_pdf_text(data: bytes) -> list[tuple[int, str]]:
     try:
         with fitz.open(stream=data, filetype="pdf") as pdf:
             for page_index, page in enumerate(pdf, start=1):
+                if page_numbers is not None and page_index not in page_numbers:
+                    continue
                 # 1.5x scale balances legibility and memory use for CPU-only hosts.
                 pixmap = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
                 image_text = _recognize_image(pixmap.tobytes("png"))
