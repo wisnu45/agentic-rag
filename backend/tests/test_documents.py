@@ -34,3 +34,13 @@ def test_document_search_requires_authentication():
         assert response.status_code == 401
     finally:
         app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(username="test-admin", role="admin")
+
+
+def test_viewer_cannot_upload_documents():
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(username="read-only", role="viewer")
+    response = client.post(
+        "/api/documents",
+        files={"file": ("notes.txt", b"sample", "text/plain")},
+    )
+    assert response.status_code == 403
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(username="test-admin", role="admin")
