@@ -48,7 +48,7 @@ def create_access_token(username: str) -> str:
     """Issue a short-lived JWT; refuses to operate without an explicit secret."""
     settings = get_settings()
     secret = settings.jwt_secret_key.strip()
-    if len(secret) < 32:
+    if len(secret) < 32 or secret.startswith("REPLACE_WITH"):
         raise RuntimeError("JWT_SECRET_KEY must be configured with at least 32 characters.")
     now = datetime.now(timezone.utc)
     return jwt.encode(
