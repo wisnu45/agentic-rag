@@ -88,3 +88,25 @@ def test_invalid_webhook_response_is_rejected(monkeypatch):
     monkeypatch.setattr(orchestration.httpx, "post", lambda *args, **kwargs: FakeResponse())
     with pytest.raises(orchestration.OrchestrationError, match="field named 'answer'"):
         orchestration.generate_agent_answer("question", [])
+
+
+def test_non_object_webhook_response_is_rejected(monkeypatch):
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return ["not", "an", "object"]
+
+    monkeypatch.setattr(
+        orchestration,
+        "get_settings",
+        lambda: SimpleNamespace(
+            n8n_chat_webhook_url="https://n8n.example/webhook/chat",
+            n8n_webhook_secret="test-secret-value-with-at-least-32-characters",
+            n8n_timeout_seconds=90,
+        ),
+    )
+    monkeypatch.setattr(orchestration.httpx, "post", lambda *args, **kwargs: FakeResponse())
+    with pytest.raises(orchestration.OrchestrationError, match="JSON object"):
+        orchestration.generate_agent_answer("question", [])
